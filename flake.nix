@@ -19,8 +19,7 @@
     };
   };
   outputs = { nixpkgs, xmonad, xmonad-contrib, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
+  let 
         haskellOverlay = final: prev: {
           haskellPackages = prev.haskellPackages.override {
             overrides = self: super: {
@@ -33,8 +32,12 @@
 
             };
           };
+          my-xmonad = final.my-xmonad;
 
         };
+  in
+    flake-utils.lib.eachDefaultSystem (system:
+    let
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ haskellOverlay ];
@@ -45,7 +48,8 @@
         packages = {
           inherit (pkgs.haskellPackages) my-xmonad xmonad xmonad-contrib;
         };
-        overlay = haskellOverlay;
 
-      });
+      }) // {
+        overlay = haskellOverlay;
+      };
 }
