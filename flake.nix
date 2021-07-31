@@ -45,7 +45,7 @@
         packages = {
           inherit (pkgs.haskellPackages) my-xmonad xmonad xmonad-contrib;
         };
-        defaultOverlay = haskellOverlay;
+        overlay = haskellOverlay;
 
       });
 }
