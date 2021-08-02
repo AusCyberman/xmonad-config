@@ -32,7 +32,8 @@ polybarColour area color text
     validAreas = "FBRuoT"
 
 colourCurrent = "#f9f9f9"
-colourVisible = "#5AB1BB"
+--colourVisible = "#5AB1BB"
+colourVisible = "#ffd1dc"
 colourHidden = "#ffeFdc"
 colourHiddenNoWindows = "#343434"
 polybarPP ws =

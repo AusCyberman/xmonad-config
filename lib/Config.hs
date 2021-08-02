@@ -67,7 +67,7 @@ onLaunch =
     , "dunst"
     , "~/.config/polybar/launch.sh"
     , "xrandr --output DP-0 --off --output DP-1 --off --output HDMI-0 --primary --mode 1920x1080 --pos 1920x0 --rotate normal --output DP-2 --off --output DP-3 --off --output DP-4 --off --output DP-5 --mode 1920x1080 --pos 0x0 --rotate normal --output USB-C-0 --off"
-    , "feh --bg-fill ~/backgrounds/ghost.png"
+    , "nitrogen --restore "
     , "xset m 0 0"
     , "xset s on && xset s 300"
     , "1password --silent"
@@ -201,13 +201,15 @@ icons =
         , className =? "Spotify" <||> className =? "spotify" --> appIcon "阮"
         , className =? "jetbrains-idea" --> appIcon "\xe7b5"
         , className =? "Skype" --> appIcon "\61822"
-        , (("nvim" `isPrefixOf`) <$> title <&&> (className =? "Alacritty")) --> appIcon "\59333"
+        , (("nvim" `isPrefixOf`) <$> title <&&> (className =? "wezterm")) --> appIcon "\59333"
         ]
 
 -- Colors
-mainColor = "#FFEBEF"
-
-secondaryColor = "#8BB2C1"
+--mainColor = "#FFEBEF"
+--
+--secondaryColor = "#8BB2C1"
+mainColor = "#FFDB9E"
+secondaryColor = "#ffd1dc"
 
 tertiaryColor = "#A3FFE6"
 

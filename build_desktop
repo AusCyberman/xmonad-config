@@ -1,5 +1,4 @@
 #!/bin/sh
 set -e
 nix build $HOME/dotfiles/xmonad-config
-rm $1
-ln -s result/bin/my-xmonad "$1"
+ln -s result/bin/my-xmonad "$1" || true
