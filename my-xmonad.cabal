@@ -22,5 +22,9 @@ executable my-xmonad
 executable media-bar
   main-is:  bar.hs
   hs-source-dirs: lib
-  other-modules: Polybar
+  other-modules: Polybar, DynamicLog, ExtraState
   build-depends: base, X11, dbus, xmonad, xmonad-contrib, containers, process
+executable xmonadctl
+  main-is: xmonadctl.hs
+  hs-source-dirs: lib
+  build-depends: base, X11
