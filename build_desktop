@@ -1,4 +1,5 @@
 #!/bin/sh
 set -e
-nix build $HOME/dotfiles/xmonad-config
-ln -s result/bin/my-xmonad "$1" || true
+stack build :my-xmonad --verbosity error
+stack install :my-xmonad  --local-bin-path bin/ --verbosity error
+ln -s bin/my-xmonad "$1" || true
