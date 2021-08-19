@@ -29,6 +29,7 @@ resolver: lts-18.3
 #   - auto-update
 #   - wai
 packages:
+- /home/auscyber/xmonad
 - .
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
@@ -36,7 +37,6 @@ packages:
 #
 extra-deps:
   - X11-1.10@sha256:ed01fba28081d6922462c2727a9a2e71f8ec3d962ed18963eee0c770558817d9,3703
-  - /home/auscyber/xmonad
   - /home/auscyber/xmonad-contrib
 
 
