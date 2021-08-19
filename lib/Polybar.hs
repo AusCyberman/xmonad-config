@@ -32,32 +32,41 @@ polybarColour area color text
     validAreas = "FBRuoT"
 
 colourCurrent = "#f9f9f9"
+
 --colourVisible = "#5AB1BB"
 colourVisible = "#ffd1dc"
 colourHidden = "#ffeFdc"
 colourHiddenNoWindows = "#343434"
-polybarPP ws =
-    def
-        { {-ppCurrent = polybarWorkspace (polybarUnderlineWithColor "#FFCFD1" . polybarColour 'F' "#FFDB9E" ) ws False
-          , ppHidden = polybarWorkspace (polybarColour 'F' "#E88B84") ws True
-          , ppVisible = polybarWorkspace (polybarColour 'F' "#FFC9AB"  . wrap "[" "]") ws True
-          , ppHiddenNoWindows = polybarWorkspace (polybarColour 'F' "#5754B3") ws True -}
-          ppCurrent = polybarUnderlineWithColor colourCurrent . pad -- . iconCurrent
-        , ppHidden = polybarUnderlineWithColor colourHidden . pad -- .  iconHidden
-        , ppVisible = polybarUnderlineWithColor colourVisible . pad -- .  iconCurrent
-        , ppHiddenNoWindows = polybarColour 'F' colourHiddenNoWindows . wrap " " " " -- . iconHidden
-        , ppTitleSanitize = shorten 70 . ppTitle def
-        , ppTitle = polybarColour 'F' "#FFFFFF"
-        , ppWsSep = ""
-        , ppSep = polybarColour 'F' "#4D3636" " | "
-        , ppOutput = io . appendFile "/tmp/.xmonad-workspace-log" . flip (++) "\n" . xmonadPolybarAction 4 "nextws" . xmonadPolybarAction 5 "prevws"
-        , ppLayout = xmonadPolybarAction 1 "next-layout" . xmonadPolybarAction 3 "default-layout"
-        --  , ppOrder = \(x:xs) -> wrap "%{T2}" "%{T-}" x:xs
-        --    , ppOrder = \(x:_:y) -> x:y
-        }
+polybarPP defaultIcons =
+    let iconCurrent x
+            | x `elem` defaultIcons = switchAndMoveF x "\xf111"
+            | otherwise = x
 
-switchMoveWindowsPolybar :: PP -> PP
-switchMoveWindowsPolybar pp =
+        iconHidden x
+            | x `elem` defaultIcons = switchAndMoveF x "\xf10c"
+            | otherwise = x
+     in def
+            { {-ppCurrent = polybarWorkspace (polybarUnderlineWithColor "#FFCFD1" . polybarColour 'F' "#FFDB9E" ) ws False
+              , ppHidden = polybarWorkspace (polybarColour 'F' "#E88B84") ws True
+              , ppVisible = polybarWorkspace (polybarColour 'F' "#FFC9AB"  . wrap "[" "]") ws True
+              , ppHiddenNoWindows = polybarWorkspace (polybarColour 'F' "#5754B3") ws True -}
+              ppCurrent = polybarUnderlineWithColor colourCurrent . pad . iconCurrent
+            , ppHidden = polybarUnderlineWithColor colourHidden . pad . iconHidden
+            , ppVisible = polybarUnderlineWithColor colourVisible . pad . iconCurrent
+            , ppHiddenNoWindows = polybarColour 'F' colourHiddenNoWindows . wrap " " " " . iconHidden
+            , ppTitleSanitize = shorten 70 . ppTitle def
+            , ppTitle = polybarColour 'F' "#FFFFFF"
+            , ppWsSep = ""
+            , ppSep = polybarColour 'F' "#4D3636" " | "
+            , ppOutput = io . appendFile "/tmp/.xmonad-workspace-log" . flip (++) "\n" . xmonadPolybarAction 4 "nextws" . xmonadPolybarAction 5 "prevws"
+            , ppLayout = xmonadPolybarAction 1 "next-layout" . xmonadPolybarAction 3 "default-layout"
+            --
+            --  , ppOrder = \(x:xs) -> wrap "%{T2}" "%{T-}" x:xs
+            --    , ppOrder = \(x:_:y) -> x:y
+            }
+
+switchMoveWindowsPolybar :: [WorkspaceId] -> PP -> PP
+switchMoveWindowsPolybar defaultIcons pp =
     pp
         { ppRename = ppRename pp >=> switchAndMove
         }
@@ -67,15 +76,6 @@ switchMoveWindowsPolybar pp =
         | otherwise = b
 
 switchAndMoveF x = xmonadPolybarAction 1 ("view\\\"" ++ x ++ "\\\"") . xmonadPolybarAction 3 ("moveTo\"" ++ x ++ "\"")
-
-defaultIcons = map show [1 .. 10]
-iconCurrent x
-    | x `elem` defaultIcons = switchAndMoveF x "\xf111"
-    | otherwise = x
-
-iconHidden x
-    | x `elem` defaultIcons = switchAndMoveF x "\xf10c"
-    | otherwise = x
 
 --iconCurrent = \xf10c""\xf10c"
 

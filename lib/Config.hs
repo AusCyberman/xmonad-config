@@ -3,12 +3,12 @@
 
 module Config (myConfig, ExtraState) where
 
-import Control.Monad
-import DBus
-import DBus.Client
-import Data.Bifunctor
+import Control.Monad ((>=>))
+import DBus ()
+import DBus.Client (Client)
+import Data.Bifunctor (Bifunctor (first, second))
 import Data.Function (on)
-import Data.Functor
+import Data.Functor ()
 import Data.List (
     elemIndex,
     isSuffixOf,
@@ -16,53 +16,105 @@ import Data.List (
     nubBy,
  )
 import qualified Data.Map as M
-import DynamicLog
-import ExtraState
-import Media
-import Polybar
-import SysDependent
-import System.Exit
-import WorkspaceSet
+import Data.Maybe
+import DynamicLog (dynamicLogString)
+import ExtraState (ExtraState (dbus_client))
+import Media (next, playPause, previous)
+import Polybar (polybarPP, switchMoveWindowsPolybar)
+import SysDependent ()
+import System.Exit ()
+import WorkspaceSet (
+    WorkspaceSetId,
+    moveToNextWsSet,
+    moveToPrevWsSet,
+    nextWSSet,
+    prevWSSet,
+ )
 import XMonad
-import XMonad.Actions.Commands
-import XMonad.Actions.CycleWS
-import XMonad.Actions.KeyRemap
-import XMonad.Actions.Search
-import XMonad.Actions.WorkspaceNames
-import XMonad.Hooks.DynamicIcons
-import XMonad.Hooks.DynamicLog
-import XMonad.Hooks.EwmhDesktops
-import XMonad.Hooks.ManageDocks
-import XMonad.Hooks.ManageHelpers
-import XMonad.Hooks.ScreenCorners
-import XMonad.Hooks.ServerMode
-import XMonad.Hooks.WindowSwallowing
+import XMonad.Actions.Commands ()
+import XMonad.Actions.CycleWS (nextWS, prevWS)
+import XMonad.Actions.KeyRemap (
+    KeymapTable (..),
+    emptyKeyRemap,
+    setDefaultKeyRemap,
+    setKeyRemap,
+ )
+import XMonad.Actions.Search (isPrefixOf)
+import XMonad.Actions.WorkspaceNames (
+    renameWorkspace,
+    workspaceNamesPP,
+ )
+import XMonad.Hooks.DynamicIcons (
+    IconConfig (iconConfigFilter, iconConfigFmt, iconConfigIcons),
+    appIcon,
+    dynamicIconsPP,
+    iconsFmtReplace,
+    iconsGetFocus,
+    wrapUnwords,
+ )
+import XMonad.Hooks.DynamicLog (
+    PP (PP, ppOutput, ppRename),
+    filterOutWsPP,
+ )
+import XMonad.Hooks.EwmhDesktops (
+    ewmhDesktopsEventHook,
+    ewmhDesktopsLogHookCustom,
+    ewmhDesktopsStartup,
+    ewmhFullscreen,
+    fullscreenEventHook,
+ )
+import XMonad.Hooks.ManageDocks (
+    avoidStruts,
+    docksEventHook,
+    manageDocks,
+ )
+import XMonad.Hooks.ManageHelpers (doFullFloat)
+import XMonad.Hooks.ScreenCorners ()
+import XMonad.Hooks.ServerMode (serverModeEventHookCmd)
+
+--import XMonad.Hooks.WindowSwallowing ()
 import qualified XMonad.Layout.Fullscreen as F
-import XMonad.Layout.Gaps
-import XMonad.Layout.MultiToggle
-import XMonad.Layout.MultiToggle.Instances
-import XMonad.Layout.NoBorders
+
+---import XMonad.Layout.LayoutModifier ()
+import XMonad.Layout.MultiToggle ()
+import XMonad.Layout.MultiToggle.Instances ()
+import XMonad.Layout.NoBorders (smartBorders)
 import XMonad.Layout.PerWorkspace (onWorkspace)
-import XMonad.Layout.SimpleFloat
-import XMonad.Layout.Spacing
+import XMonad.Layout.Renamed (Rename (Replace), renamed)
+import XMonad.Layout.SimpleFloat ()
+import XMonad.Layout.Spacing (Border (Border), spacingRaw)
 import XMonad.Layout.Tabbed
-import XMonad.Prompt
-import XMonad.Prompt.Shell
-import XMonad.Prompt.Window
-import XMonad.Prompt.XMonad
+import XMonad.Prompt (
+    XPConfig (fgColor, font, position),
+    XPPosition (CenteredAt),
+ )
+import XMonad.Prompt.Shell (shellPrompt)
+import XMonad.Prompt.Window ()
+import XMonad.Prompt.XMonad ()
 import qualified XMonad.StackSet as W
-import XMonad.Util.Cursor
-import XMonad.Util.EZConfig
+import XMonad.Util.Cursor ()
+import XMonad.Util.EZConfig (additionalKeysP, removeKeysP)
 import qualified XMonad.Util.ExtensibleState as XS
-import XMonad.Util.Hacks
-import XMonad.Util.NamedScratchpad
+import XMonad.Util.Hacks (
+    javaHack,
+    windowedFullscreenFixEventHook,
+ )
+import XMonad.Util.NamedScratchpad (
+    NamedScratchpad (NS, name),
+    NamedScratchpads,
+    defaultFloating,
+    namedScratchpadAction,
+    namedScratchpadManageHook,
+    nonFloating,
+    scratchpadWorkspaceTag,
+ )
 import XMonad.Util.NamedWindows (getName)
-import XMonad.Util.Run
-import XMonad.Util.SpawnOnce
-import XMonad.Util.WorkspaceCompare
+import XMonad.Util.Run (safeSpawn)
+import XMonad.Util.SpawnOnce (spawnOnce)
+import XMonad.Util.WorkspaceCompare (filterOutWs)
 
 onLaunch =
-    [ "picom --experimental-backends --daemon --dbus"
+    [ "picom --experimental-backends --daemon --dbus --config ~/.config/picom/picom2.conf"
     , "lxpolkit"
     , "dunst"
     , "~/.config/polybar/launch.sh"
@@ -72,6 +124,7 @@ onLaunch =
     , "xset s on && xset s 300"
     , "1password --silent"
     , "xss-lock i3lock"
+    , "nm-applet"
     ]
 
 rclonemounts =
@@ -102,7 +155,7 @@ myStartupHook = do
     mapM_ (\x -> spawnOnce (x ++ " &")) once
     --  addScreenCorner SCLowerRight (spawn "alacritty")
     setDefaultKeyRemap emptyKeyRemap [gameMap, emptyKeyRemap]
-    io $ forM_ [".xmonad-workspace-log"] $ \file -> safeSpawn "mkfifo" ["/tmp/" ++ file]
+    io $ safeSpawn "mkfifo" ["/tmp/.xmonad-workspace-log"]
 
 --     setDefaultCursor xC_left_ptr
 
@@ -121,29 +174,30 @@ removedKeys :: [String]
 removedKeys = ["M-p", "M-S-p", "M-S-e", "M-S-o", "M-b"]
 
 myConfig =
-    javaHack $
+    javaHack
+        .
         --    flip additionalKeys (createDefaultWorkspaceKeybinds myConfig workspaceSets) $
-        flip additionalKeysP myKeys $
-            flip removeKeysP removedKeys $
-                ewmhFullscreen $
-                    def
-                        { terminal = myTerm
-                        , borderWidth = myBorderWidth
-                        , normalBorderColor = secondaryColor
-                        , focusedBorderColor = mainColor
-                        , workspaces = myWorkspaces
-                        , modMask = mod4Mask
-                        , focusFollowsMouse = False
-                        , startupHook = myStartupHook
-                        , --      , borderWidth = 1
-                          --    , logHook = dynamicLogWithPP (polybarPP workspaceSymbols )
-                          logHook = polybarLogHook {- do
-                                                   wsNames <- XS.gets workspaceNames
-                                                   workspaceFilter (iconConfig $ polybarPP wsNames)  >>= \x -> cleanWS' >>= \y ->  ewmhDesktopsLogHookCustom (y ) -}
-                        , manageHook = myManageHook
-                        , layoutHook = myLayout
-                        , handleEventHook = myEventHook
-                        }
+        flip additionalKeysP myKeys
+        . flip removeKeysP removedKeys
+        . ewmhFullscreen
+        $ def
+            { terminal = myTerm
+            , borderWidth = myBorderWidth
+            , normalBorderColor = secondaryColor
+            , focusedBorderColor = mainColor
+            , workspaces = myWorkspaces
+            , modMask = mod4Mask
+            , focusFollowsMouse = False
+            , startupHook = myStartupHook
+            , --      , borderWidth = 1
+              --    , logHook = dynamicLogWithPP (polybarPP workspaceSymbols )
+              logHook = polybarLogHook {- do
+                                       wsNames <- XS.gets workspaceNames
+                                       workspaceFilter (iconConfig $ polybarPP wsNames)  >>= \x -> cleanWS' >>= \y ->  ewmhDesktopsLogHookCustom (y ) -}
+            , manageHook = myManageHook
+            , layoutHook = myLayout
+            , handleEventHook = myEventHook
+            }
 
 myEventHook =
     mconcat
@@ -167,17 +221,15 @@ myIconConfig =
 
 polybarLogHook :: X ()
 polybarLogHook =
-    XS.gets (polybarPP . workspaceNames)
-        --    pure (polybarPP M.empty)
-        --        >>= workspaceNamesPP
-        --  >>= DynamicLog.dynamicLogString . switchMoveWindowsPolybar . namedScratchpadFilterOutWorkspacePP>>=  io . ppOutput pp
-        {- filterOutInvalidWSet pp -}
-        >>= dynamicIconsPP myIconConfig
-        >>= \pp ->
-            pure pp
-                >>= DynamicLog.dynamicLogString . switchMoveWindowsPolybar . filterOutWsPP [scratchpadWorkspaceTag]
-                >>= io . ppOutput pp
-                >> ewmhDesktopsLogHookCustom (filterOutWs [scratchpadWorkspaceTag])
+    gets (map W.tag . W.workspaces . windowset)
+        >>= \str ->
+            dynamicIconsPP myIconConfig (polybarPP myWorkspaces)
+                >>= \pp ->
+                    pure pp
+                        >>= workspaceNamesPP
+                        >>= DynamicLog.dynamicLogString . switchMoveWindowsPolybar str . filterOutWsPP [scratchpadWorkspaceTag]
+                        >>= io . ppOutput pp
+                        >> ewmhDesktopsLogHookCustom (filterOutWs [scratchpadWorkspaceTag])
 
 ewwLogHook :: X ()
 ewwLogHook = do
@@ -197,19 +249,30 @@ icons =
     composeAll
         [ className =? "Discord" --> appIcon "\xfb6e"
         , className =? "Chromium-browser" --> appIcon "\xf268"
-        , className =? "Firefox" --> appIcon "\63288"
+        , className =? "firefox" --> appIcon "\63288"
         , className =? "Spotify" <||> className =? "spotify" --> appIcon "阮"
         , className =? "jetbrains-idea" --> appIcon "\xe7b5"
         , className =? "Skype" --> appIcon "\61822"
-        , (("nvim" `isPrefixOf`) <$> title <&&> (className =? "wezterm")) --> appIcon "\59333"
+        , (("vim" `isPrefixOf`) <$> title <&&> (className =? "org.wezfurlong.wezterm")) --> appIcon "\59333"
         ]
 
+theme :: Theme
+theme =
+    def
+        { activeColor = mainColor
+        , inactiveColor = secondaryColor
+        , activeTextColor = "#121212"
+        --        , fontName = "Hasklug Nerd Font"
+        }
+
 -- Colors
---mainColor = "#FFEBEF"
+mainColor = "#FFEBEF"
+
 --
---secondaryColor = "#8BB2C1"
-mainColor = "#FFDB9E"
-secondaryColor = "#ffd1dc"
+secondaryColor = "#8BB2C1"
+
+--mainColor = "#FFDB9E"
+--secondaryColor = "#ffd1dc"
 
 tertiaryColor = "#A3FFE6"
 
@@ -217,24 +280,17 @@ myTerm = "wezterm"
 
 myBorderWidth = 1
 
-myTabConfig =
-    def
-        { inactiveBorderColor = "#FF0000"
-        , activeTextColor = "#00FF00"
-        }
-
 myLayout =
-    --  screenCornerLayoutHook $
-    smartBorders $
-        spacingRaw True (Border 0 10 10 10) True (Border 10 10 10 10) True $
-            avoidStruts $
-                onWorkspace "9" simpleFloat $
-                    tiled
-                        ||| Mirror tiled
-                        ||| Full
+    conf (tiled ||| tab) ||| smartBorders Full
   where
-    -- default tiling algorithm partitions the screen into two panes
-    tiled = Tall nmaster delta ratio
+    tab = rename "Tabbed" $ tabbed shrinkText theme
+    tiled = rename "Tiled" $ Tall nmaster delta ratio
+
+    conf = avoidStruts . gaps . smartBorders
+
+    gaps = spacingRaw True (Border 0 10 10 10) True (Border 10 10 10 10) True
+
+    rename = renamed . ((: []) . Replace)
 
     -- The default number of windows in the master pane
     nmaster = 1
@@ -266,14 +322,14 @@ myManageHook =
 
 type NamedScratchPadSet = [(String, NamedScratchpad)]
 
-scratchpadSet :: [(String, NamedScratchpad)]
+scratchpadSet :: NamedScratchPadSet
 scratchpadSet =
     [ ("M-C-s", NS "spotify" "spotify" (className =? "Spotify") defaultFloating)
     , ("M-C-o", NS "onenote" "p3x-onenote" (className =? "p3x-onenote") nonFloating)
-    , ("M-C-d", NS "discord" "Discord" (("discord" `isSuffixOf`) <$> className) nonFloating)
+    , ("M-C-d", NS "discord" "discord" (("discord" `isSuffixOf`) <$> className) nonFloating)
     , ("M-S-C-m", NS "skype" "skypeforlinux" (className =? "Skype") defaultFloating)
     , ("M-C-t", NS "terminal" (myTerm ++ " -t \"scratchpad term\"") (title =? "scratchpad term") defaultFloating)
-    , ("M-C-m", NS "mail" "thunderbird" (className =? "Mail" <||> className =? "thunderbird") nonFloating)
+    , ("M-C-m", NS "mail" "thunderbird" (className =? "Mail" <||> className =? "Thunderbird") nonFloating)
     , ("M-S-C-t", NS "teams" "teams" (className =? "Microsoft Teams - Preview") nonFloating)
     , ("M-C-a", NS "authy" "authy" (className =? "Authy Desktop") defaultFloating)
     , ("M-C-p", NS "1password" "1password" (className =? "1Password") nonFloating)
@@ -282,10 +338,10 @@ scratchpadSet =
 getScratchPads :: NamedScratchPadSet -> NamedScratchpads
 getScratchPads = map snd
 
-getScratchPadKeys :: NamedScratchPadSet -> [(String, X ())]
+getScratchPadKeys :: NamedScratchPadSet -> [(String, X (), Maybe String)]
 getScratchPadKeys ns = map mapFunc ns
   where
-    mapFunc (key, NS{name = name'}) = (key, namedScratchpadAction ns' name')
+    mapFunc (key, NS{name = name'}) = (key, namedScratchpadAction ns' name', doc $ "Toggle Scratchpad " ++ name')
     ns' = getScratchPads ns
 
 scratchpads = getScratchPads scratchpadSet
@@ -294,19 +350,21 @@ scratchpadKeys = getScratchPadKeys scratchpadSet
 
 appKeys =
     map
-        (second spawn)
-        [ ("M-S-r", "~/.config/rofi/bin/launcher_colorful")
+        (first spawn)
+        [ ("M-S-r", "~/.config/rofi/bin/launcher_colorful", doc "Launch rofi")
         , -- Start alacritty
-          ("M-S-t", myTerm)
+          ("M-S-t", myTerm, doc $ "Launch " ++ myTerm)
         , --Take screenshot
-          ("M-S-s", "~/.xmonad/screenshot-sec.sh")
+          ("M-S-s", "~/.xmonad/screenshot-sec.sh", doc "Take screenshot")
         , --Chrome
-          ("M-S-g", "firefox")
+          ("M-S-g", "firefox", doc "Launch Firefox")
         , --Start emacs
-          ("M-d", "emacsclient -c")
+          ("M-d", "emacsclient -c", doc "Start emacs client")
         ]
 
-myKeys =
+myKeys = map (\(x, y, _) -> (x, y)) keyCombination
+documentation = concatMap (\(x, _, y) -> maybeToList y >>= \a -> x ++ " " ++ a ++ "\n") keyCombination
+keyCombination =
     concat
         [ scratchpadKeys
         , multiScreenKeys
@@ -316,30 +374,35 @@ myKeys =
         ]
 
 multiScreenKeys =
-    [ ("M" ++ m ++ key, screenWorkspace sc >>= flip whenJust (windows . f))
+    [ ("M" ++ m ++ key, screenWorkspace sc >>= flip whenJust (windows . f), doc (action ++ "Display #" ++ show sc))
     | (key, sc) <- zip ["-e", "-w"] [0 ..]
-    , (f, m) <- [(W.view, ""), (W.shift, "-S")]
+    , (f, m, action) <- [(W.view, "", "View "), (W.shift, "-S", "Shift focused window to")]
     ]
 
+noDoc = Nothing
+doc = Just
+
 customKeys =
-    [ ("<XF86AudioPrev>", dbusAction previous)
-    , ("<XF86AudioNext>", dbusAction next)
-    , ("<XF86AudioPlay>", dbusAction playPause)
-    , ("<XF86AudioRaiseVolume>", spawn "pactl set-sink-volume @DEFAULT_SINK@ +2%")
-    , ("<XF86AudioLowerVolume>", spawn "pactl set-sink-volume @DEFAULT_SINK@ -2%")
-    , ("<XF86AudioMute>", spawn "pactl set-sink-mute @DEFAULT_SINK@ toggle")
+    [ ("<XF86AudioPrev>", dbusAction previous, Just "Previous track")
+    , ("<XF86AudioNext>", dbusAction next, Just "Next Track")
+    , ("<XF86AudioPlay>", dbusAction playPause, Just "Play")
+    , ("<XF86AudioRaiseVolume>", spawn "pactl set-sink-volume @DEFAULT_SINK@ +2%", Just "Raise Volume")
+    , ("<XF86AudioLowerVolume>", spawn "pactl set-sink-volume @DEFAULT_SINK@ -2%", Just "Lower Volume")
+    , ("<XF86AudioMute>", spawn "pactl set-sink-mute @DEFAULT_SINK@ toggle", Just "Mute Audio")
     , --  Reset the layouts on the current workspace to default
       -- Swap the focused and the master window
       -- Polybar toggle
-      ("M-b", spawn "polybar-msg cmd toggle")
+      ("M-b", spawn "polybar-msg cmd toggle", Just "Toggle Polybar")
     , --    , ("M-r", promptSearchBrowser promptConfig "chromium" hoogle )
-      ("M-r", shellPrompt promptConfig)
-    , ("M-m", nextWSSet True)
-    , ("M-n", prevWSSet True)
-    , ("M-S-m", moveToNextWsSet True)
-    , ("M-S-n", moveToPrevWsSet True)
-    , ("C-M-`", setKeyRemap gameMap)
-    , ("C-M-S-`", setKeyRemap emptyKeyRemap)
+      ("M-r", renameWorkspace promptConfig, Just "Rename Current Workspace")
+    , ("M-C-r", shellPrompt promptConfig, Just "Open xmonad run prompt")
+    , ("M-m", nextWSSet True, Nothing)
+    , ("M-n", prevWSSet True, Nothing)
+    , ("M-S-m", moveToNextWsSet True, Nothing)
+    , ("M-S-n", moveToPrevWsSet True, Nothing)
+    , ("M-C-`", setKeyRemap gameMap, Nothing)
+    , ("M-C-S-`", setKeyRemap emptyKeyRemap, Nothing)
+    , ("M-C-h", spawn $ "xmessage \'" ++ documentation ++ "\'", doc "Show help")
     --
     --    , ("M1-<Tab>", nextWS )
     --    , ("M1-S-<Tab>", prevWS)S)

@@ -65,7 +65,7 @@ moveToWS :: String -> String -> String
 moveToWS id = xmonadPolybarAction 3 ("moveTo" ++ id)
 
 xmonadPolybarAction :: Int -> String -> String -> String
-xmonadPolybarAction but x = polyBarAction but ("~/.xmonad/xmonadctl " ++ x)
+xmonadPolybarAction but x = polyBarAction but ("xmonadctl " ++ x)
 sepBy ::
     -- | separator
     String ->
