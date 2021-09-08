@@ -94,7 +94,7 @@ dynamicLogString pp = do
     wt <- maybe (return "") (fmap show . getName) . S.peek $ winset
 
     -- run extra loggers, ignoring any that generate errors.
-    extras <- mapM (flip catchX (return Nothing)) $ ppExtras pp
+    extras <- mapM (`catchX` (return Nothing)) $ ppExtras pp
 
     return $
         sepBy (ppSep pp) . ppOrder pp $

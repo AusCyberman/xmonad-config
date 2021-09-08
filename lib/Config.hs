@@ -18,11 +18,10 @@ import Data.List (
 import qualified Data.Map as M
 import Data.Maybe
 import DynamicLog (dynamicLogString)
+import Eww
 import ExtraState (ExtraState (dbus_client))
 import Media (next, playPause, previous)
 import Polybar (polybarPP, switchMoveWindowsPolybar)
-import SysDependent ()
-import System.Exit ()
 import WorkspaceSet (
     WorkspaceSetId,
     moveToNextWsSet,
@@ -155,7 +154,7 @@ myStartupHook = do
     mapM_ (\x -> spawnOnce (x ++ " &")) once
     --  addScreenCorner SCLowerRight (spawn "alacritty")
     setDefaultKeyRemap emptyKeyRemap [gameMap, emptyKeyRemap]
-    io $ safeSpawn "mkfifo" ["/tmp/.xmonad-workspace-log"]
+    io $ mapM_ (safeSpawn "mkfifo" . (: [])) ["/tmp/.xmonad-workspace-log", "/tmp/xmonad-status-json.log"]
 
 --     setDefaultCursor xC_left_ptr
 
@@ -191,9 +190,9 @@ myConfig =
             , startupHook = myStartupHook
             , --      , borderWidth = 1
               --    , logHook = dynamicLogWithPP (polybarPP workspaceSymbols )
-              logHook = polybarLogHook {- do
-                                       wsNames <- XS.gets workspaceNames
-                                       workspaceFilter (iconConfig $ polybarPP wsNames)  >>= \x -> cleanWS' >>= \y ->  ewmhDesktopsLogHookCustom (y ) -}
+              logHook = polybarLogHook >> ewwLogHook {- do
+                                                     wsNames <- XS.gets workspaceNames
+                                                     workspaceFilter (iconConfig $ polybarPP wsNames)  >>= \x -> cleanWS' >>= \y ->  ewmhDesktopsLogHookCustom (y ) -}
             , manageHook = myManageHook
             , layoutHook = myLayout
             , handleEventHook = myEventHook
@@ -221,22 +220,35 @@ myIconConfig =
 
 polybarLogHook :: X ()
 polybarLogHook =
-    gets (map W.tag . W.workspaces . windowset)
+    gets
+        (map W.tag . W.workspaces . windowset)
         >>= \str ->
             dynamicIconsPP myIconConfig (polybarPP myWorkspaces)
+                >>= fmap (filterOutWsPP [scratchpadWorkspaceTag]) <$> workspaceNamesPP
                 >>= \pp ->
                     pure pp
-                        >>= workspaceNamesPP
-                        >>= DynamicLog.dynamicLogString . switchMoveWindowsPolybar str . filterOutWsPP [scratchpadWorkspaceTag]
+                        >>= DynamicLog.dynamicLogString . switchMoveWindowsPolybar str
                         >>= io . ppOutput pp
                         >> ewmhDesktopsLogHookCustom (filterOutWs [scratchpadWorkspaceTag])
+                        >> writeCurrentState pp "/tmp/xmonad-status-json.log"
 
 ewwLogHook :: X ()
 ewwLogHook = do
-    PP{ppRename = ren} <- dynamicIconsPP (def{iconConfigFmt = iconsFmtReplace (wrapUnwords "[" "]"), iconConfigIcons = icons}) def
-    let func = map (\ws -> ws{W.tag = ren (W.tag ws) ws})
-    let func2 = map (\ws -> ws{W.tag = if W.tag ws `elem` map show [1 .. 9] then "\xf10c" else W.tag ws})
-    ewmhDesktopsLogHookCustom (func2 . func . filterOutWs [scratchpadWorkspaceTag])
+    gets
+        (map W.tag . W.workspaces . windowset)
+        >>= \str ->
+            dynamicIconsPP myIconConfig (ewwPP myWorkspaces)
+                >>= fmap (filterOutWsPP [scratchpadWorkspaceTag]) <$> workspaceNamesPP
+                >>= \pp ->
+                    pure pp
+                        >>= DynamicLog.dynamicLogString
+                        >>= io
+                            . ppOutput
+                                pp
+                            >> ewmhDesktopsLogHookCustom
+                                (filterOutWs [scratchpadWorkspaceTag])
+
+--                        >> writeCurrentState pp "/tmp/xmonad-status-json.log"
 
 workspaceSets :: [(WorkspaceSetId, [WorkspaceId])]
 workspaceSets =
@@ -417,6 +429,6 @@ promptConfig =
     )
 
 workspaceKeys =
-    [ ("M-l", nextWS)
+    [ ("M-L", nextWS)
     , ("M-h", prevWS)
     ]

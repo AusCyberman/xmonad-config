@@ -1,5 +1,13 @@
 #!/bin/sh
+stack install :xmonad
 set -e
-stack build :my-xmonad --verbosity error
-stack install :my-xmonad  --local-bin-path bin/ --verbosity error
-ln -s bin/my-xmonad "$1" || true
+PROJ=my-xmonad
+stack build :$PROJ --verbosity error
+stack install :$PROJ  --local-bin-path bin/ --verbosity error
+if [[ "$(readlink $1)" != "bin/$PROJ" ]];
+then
+    {
+        rm $1
+    ln -s bin/$PROJ "$1"
+} || true
+fi
