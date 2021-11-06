@@ -300,7 +300,7 @@ myLayout =
 
     conf = avoidStruts . gaps . smartBorders
 
-    gaps = spacingRaw True (Border 0 10 10 10) True (Border 10 10 10 10) True
+    gaps = spacingRaw False (Border 0 10 10 10) True (Border 10 10 10 10) True
 
     rename = renamed . ((: []) . Replace)
 
@@ -337,7 +337,7 @@ type NamedScratchPadSet = [(String, NamedScratchpad)]
 scratchpadSet :: NamedScratchPadSet
 scratchpadSet =
     [ ("M-C-s", NS "spotify" "spotify" (className =? "Spotify") defaultFloating)
-    , ("M-C-o", NS "onenote" "p3x-onenote" (className =? "p3x-onenote") nonFloating)
+    , ("M-C-o", NS "obsidian" "obsidian" (className =? "obsidian") nonFloating)
     , ("M-C-d", NS "discord" "discord" (("discord" `isSuffixOf`) <$> className) nonFloating)
     , ("M-S-C-m", NS "skype" "skypeforlinux" (className =? "Skype") defaultFloating)
     , ("M-C-t", NS "terminal" (myTerm ++ " -t \"scratchpad term\"") (title =? "scratchpad term") defaultFloating)
